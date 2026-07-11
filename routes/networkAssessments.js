@@ -20,24 +20,28 @@ router.post("/", requireAuth, async (req, res) => {
     const sql = `
       INSERT INTO network_assessments (
         asset_id, enumerator_id, enumerator_name, assessment_date,
-        asset_type, asset_tag, gps, district, location_description,
-        capacity_rating, voltage_level, install_year, phase_type, conductor_type,
+        asset_type, asset_category, asset_tag, gps, zone, district, injection_substation, location_description,
+        capacity_rating, voltage_level, equipment_rating, install_year, phase_type, conductor_type,
         physical_condition, visible_defects, last_maintenance_date, repair_urgency,
         notes
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
       )
       ON CONFLICT (asset_id) DO UPDATE SET
         enumerator_id          = EXCLUDED.enumerator_id,
         enumerator_name        = EXCLUDED.enumerator_name,
         assessment_date         = EXCLUDED.assessment_date,
         asset_type              = EXCLUDED.asset_type,
+        asset_category           = EXCLUDED.asset_category,
         asset_tag               = EXCLUDED.asset_tag,
         gps                     = EXCLUDED.gps,
+        zone                    = EXCLUDED.zone,
         district                = EXCLUDED.district,
+        injection_substation    = EXCLUDED.injection_substation,
         location_description    = EXCLUDED.location_description,
         capacity_rating         = EXCLUDED.capacity_rating,
         voltage_level           = EXCLUDED.voltage_level,
+        equipment_rating         = EXCLUDED.equipment_rating,
         install_year            = EXCLUDED.install_year,
         phase_type              = EXCLUDED.phase_type,
         conductor_type          = EXCLUDED.conductor_type,
@@ -56,12 +60,16 @@ router.post("/", requireAuth, async (req, res) => {
       req.user.full_name,
       f.date                  || null,
       f.assetType              || null,
+      f.assetCategory          || null,
       f.assetTag               || null,
       f.gps                    || null,
+      f.zone                   || null,
       f.district               || null,
+      f.injectionSubstation    || null,
       f.locationDescription    || null,
       f.capacityRating         || null,
       f.voltageLevel           || null,
+      f.equipmentRating        || null,
       f.installYear            || null,
       f.phaseType              || null,
       f.conductorType          || null,
@@ -203,17 +211,17 @@ router.get("/export/csv", requireAuth, requireAdmin, async (req, res) => {
     );
 
     const headers = [
-      "Asset ID","Asset Type","Asset Tag","District","Location","Enumerator","Date",
-      "Capacity/Rating","Voltage Level","Install Year","Phase Type","Conductor Type",
+      "Asset ID","Asset Type","Asset Category","Asset Tag","Zone","District","Injection SS","Location","Enumerator","Date",
+      "Capacity/Rating","Voltage Level","Equipment Rating","Install Year","Phase Type","Conductor Type",
       "Condition","Defects","Last Maintenance","Repair Urgency","Submitted At",
     ];
 
     const escape = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
 
     const rows = result.rows.map(r => [
-      r.asset_id, r.asset_type, r.asset_tag, r.district, r.location_description,
+      r.asset_id, r.asset_type, r.asset_category, r.asset_tag, r.zone, r.district, r.injection_substation, r.location_description,
       r.enumerator_id, r.assessment_date,
-      r.capacity_rating, r.voltage_level, r.install_year, r.phase_type, r.conductor_type,
+      r.capacity_rating, r.voltage_level, r.equipment_rating, r.install_year, r.phase_type, r.conductor_type,
       r.physical_condition, r.visible_defects, r.last_maintenance_date, r.repair_urgency,
       r.submitted_at,
     ].map(escape).join(","));
