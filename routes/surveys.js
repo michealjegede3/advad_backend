@@ -20,18 +20,21 @@ router.post("/", requireAuth, async (req, res) => {
     const sql = `
       INSERT INTO surveys (
         household_id, enumerator_id, enumerator_name, survey_date,
-        customer_name, customer_address, gps, district, enumeration_area,
-        customer_type, tariff_band, payment_type, meter_number,
-        substation_name, injection_substation,
-        energy_source, consumption_month1, consumption_month2, consumption_month3,
+        customer_name, customer_address, gps, zone, district, enumeration_area, customer_status,
+        customer_type, customer_class, nature_of_business, tariff_band, payment_type, metering_status, meter_number,
+        feeder_name, substation_name, injection_substation,
+        transformer_category, transformer_capacity, transformer_name,
+        energy_source, connected_to_grid, load_month1, load_month2, load_month3,
+        consumption_month1, consumption_month2, consumption_month3,
         connection_duration, monthly_bill_range, outage_frequency, satisfaction_rating, reported_issues,
         reason_not_connected, interest_in_connecting, acceptable_monthly_cost,
-        max_monthly_amount, preferred_payment_method, payment_frequency,
-        primary_livelihood, business_from_home, productivity_impact, estimated_income_lost,
+        willingness_to_accept_ipp,
+        primary_livelihood, business_from_home, productivity_impact,
         notes
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35
+        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
+        $39,$40,$41,$42,$43,$44,$45
       )
       ON CONFLICT (household_id) DO UPDATE SET
         enumerator_id           = EXCLUDED.enumerator_id,
@@ -40,15 +43,28 @@ router.post("/", requireAuth, async (req, res) => {
         customer_name           = EXCLUDED.customer_name,
         customer_address        = EXCLUDED.customer_address,
         gps                     = EXCLUDED.gps,
+        zone                    = EXCLUDED.zone,
         district                = EXCLUDED.district,
         enumeration_area        = EXCLUDED.enumeration_area,
+        customer_status         = EXCLUDED.customer_status,
         customer_type           = EXCLUDED.customer_type,
+        customer_class          = EXCLUDED.customer_class,
+        nature_of_business      = EXCLUDED.nature_of_business,
         tariff_band             = EXCLUDED.tariff_band,
         payment_type            = EXCLUDED.payment_type,
+        metering_status         = EXCLUDED.metering_status,
         meter_number            = EXCLUDED.meter_number,
+        feeder_name             = EXCLUDED.feeder_name,
         substation_name         = EXCLUDED.substation_name,
         injection_substation    = EXCLUDED.injection_substation,
+        transformer_category    = EXCLUDED.transformer_category,
+        transformer_capacity    = EXCLUDED.transformer_capacity,
+        transformer_name        = EXCLUDED.transformer_name,
         energy_source           = EXCLUDED.energy_source,
+        connected_to_grid       = EXCLUDED.connected_to_grid,
+        load_month1             = EXCLUDED.load_month1,
+        load_month2             = EXCLUDED.load_month2,
+        load_month3             = EXCLUDED.load_month3,
         consumption_month1      = EXCLUDED.consumption_month1,
         consumption_month2      = EXCLUDED.consumption_month2,
         consumption_month3      = EXCLUDED.consumption_month3,
@@ -60,19 +76,17 @@ router.post("/", requireAuth, async (req, res) => {
         reason_not_connected    = EXCLUDED.reason_not_connected,
         interest_in_connecting  = EXCLUDED.interest_in_connecting,
         acceptable_monthly_cost = EXCLUDED.acceptable_monthly_cost,
-        max_monthly_amount      = EXCLUDED.max_monthly_amount,
-        preferred_payment_method= EXCLUDED.preferred_payment_method,
-        payment_frequency       = EXCLUDED.payment_frequency,
+        willingness_to_accept_ipp = EXCLUDED.willingness_to_accept_ipp,
         primary_livelihood      = EXCLUDED.primary_livelihood,
         business_from_home      = EXCLUDED.business_from_home,
         productivity_impact     = EXCLUDED.productivity_impact,
-        estimated_income_lost   = EXCLUDED.estimated_income_lost,
         notes                   = EXCLUDED.notes,
         submitted_at            = NOW()
       RETURNING id, household_id, submitted_at
     `;
 
     const consumption = f.consumption || {};
+    const load = f.load || {};
 
     const values = [
       f.householdId,
@@ -82,15 +96,28 @@ router.post("/", requireAuth, async (req, res) => {
       f.customerName        || null,
       f.customerAddress     || null,
       f.gps                 || null,
+      f.zone                 || null,
       f.district            || null,
       f.enumerationArea     || null,
+      f.customerStatus      || null,
       f.customerType        || null,
+      f.customerClass       || null,
+      f.natureOfBusiness    || null,
       f.tariffBand          || null,
       f.paymentType         || null,
+      f.meteringStatus      || null,
       f.meterNumber         || null,
+      f.feederName          || null,
       f.substationName      || null,
       f.injectionSubstation || null,
+      f.transformerCategory || null,
+      f.transformerCapacity || null,
+      f.transformerName     || null,
       f.energySource        || null,
+      f.connectedToGrid     || null,
+      load["Month 1"] ? parseFloat(load["Month 1"]) : null,
+      load["Month 2"] ? parseFloat(load["Month 2"]) : null,
+      load["Month 3"] ? parseFloat(load["Month 3"]) : null,
       consumption["Month 1"] ? parseFloat(consumption["Month 1"]) : null,
       consumption["Month 2"] ? parseFloat(consumption["Month 2"]) : null,
       consumption["Month 3"] ? parseFloat(consumption["Month 3"]) : null,
@@ -102,13 +129,10 @@ router.post("/", requireAuth, async (req, res) => {
       f.reasonNotConnected       || null,
       f.interestInConnecting     || null,
       f.acceptableMonthlyCost    || null,
-      f.maxMonthlyAmount         || null,
-      f.preferredPaymentMethod   || null,
-      f.paymentFrequency         || null,
+      f.willingnessToAcceptIPP   || null,
       f.primaryLivelihood        || null,
       f.businessFromHome         || null,
       f.productivityImpact       || null,
-      f.estimatedIncomeLost      || null,
       JSON.stringify(f.notes || {}),
     ];
 
@@ -148,7 +172,7 @@ router.get("/", requireAuth, async (req, res) => {
   if (district)     { conditions.push(`district = $${idx++}`);      values.push(district); }
   if (customerType) { conditions.push(`customer_type = $${idx++}`); values.push(customerType); }
   if (tariffBand)   { conditions.push(`tariff_band = $${idx++}`);   values.push(tariffBand); }
-  if (energySource) { conditions.push(`energy_source = $${idx++}`); values.push(energySource); }
+  if (energySource) { conditions.push(`energy_source ILIKE $${idx++}`); values.push(`%${energySource}%`); }
 
   if (search) {
     conditions.push(`(
@@ -197,8 +221,8 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
     const result = await db.query(`
       SELECT
         COUNT(*)                                             AS total,
-        COUNT(*) FILTER (WHERE energy_source = 'Grid')      AS connected,
-        COUNT(*) FILTER (WHERE energy_source != 'Grid')     AS unconnected,
+        COUNT(*) FILTER (WHERE energy_source ILIKE '%Grid%')  AS connected,
+        COUNT(*) FILTER (WHERE energy_source NOT ILIKE '%Grid%' OR energy_source IS NULL) AS unconnected,
         ROUND(AVG(satisfaction_rating), 1)                  AS avg_satisfaction,
         COUNT(*) FILTER (WHERE productivity_impact = 'Significantly') AS severely_impacted,
         COUNT(*) FILTER (WHERE submitted_at >= NOW() - INTERVAL '24 hours') AS new_today
@@ -250,25 +274,30 @@ router.get("/export/csv", requireAuth, requireAdmin, async (req, res) => {
     );
 
     const headers = [
-      "Household ID","Customer Name","Address","District","EA","Enumerator","Date",
-      "Type","Band","Payment","Meter","Substation","Injection SS","Energy Source",
+      "Household ID","Customer Name","Address","Zone","District","EA","Enumerator","Date","Customer Status",
+      "Type","Class","Nature of Business","Band","Payment","Metering Status","Meter",
+      "Feeder","Substation","Injection SS","Transformer Category","Transformer Capacity (kVA)","Transformer Name",
+      "Energy Source","Connected to Grid",
+      "Month 1 Load (kVA)","Month 2 Load (kVA)","Month 3 Load (kVA)",
       "Month 1 (kWh)","Month 2 (kWh)","Month 3 (kWh)","Satisfaction","Outage Freq",
-      "Reason Not Connected","Interest in Connecting","Max Monthly","Livelihood",
-      "Biz From Home","Productivity Impact","Income Lost","Submitted At",
+      "Reason Not Connected","Interest in Connecting","Willingness to Accept IPP","Livelihood",
+      "Biz From Home","Productivity Impact","Submitted At",
     ];
 
     const escape = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
 
     const rows = result.rows.map(r => [
-      r.household_id, r.customer_name, r.customer_address, r.district,
-      r.enumeration_area, r.enumerator_id, r.survey_date,
-      r.customer_type, r.tariff_band, r.payment_type, r.meter_number,
-      r.substation_name, r.injection_substation, r.energy_source,
+      r.household_id, r.customer_name, r.customer_address, r.zone, r.district,
+      r.enumeration_area, r.enumerator_id, r.survey_date, r.customer_status,
+      r.customer_type, r.customer_class, r.nature_of_business, r.tariff_band, r.payment_type, r.metering_status, r.meter_number,
+      r.feeder_name, r.substation_name, r.injection_substation, r.transformer_category, r.transformer_capacity, r.transformer_name,
+      r.energy_source, r.connected_to_grid,
+      r.load_month1, r.load_month2, r.load_month3,
       r.consumption_month1, r.consumption_month2, r.consumption_month3,
       r.satisfaction_rating, r.outage_frequency,
-      r.reason_not_connected, r.interest_in_connecting, r.max_monthly_amount,
+      r.reason_not_connected, r.interest_in_connecting, r.willingness_to_accept_ipp,
       r.primary_livelihood, r.business_from_home, r.productivity_impact,
-      r.estimated_income_lost, r.submitted_at,
+      r.submitted_at,
     ].map(escape).join(","));
 
     const csv = [headers.map(escape).join(","), ...rows].join("\n");
